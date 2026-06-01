@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🚚 Simulador de Capacidad de Transporte")
+st.title("Simulador de Capacidad de Transporte")
 
 # -----------------------------
 # CARGA DE DATOS
