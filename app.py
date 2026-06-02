@@ -20,7 +20,7 @@ df = pd.read_excel(
     archivo,
     sheet_name="Capacidad_Despacho"
 )
-st.write(df["Ruta"].unique())
+
 # -----------------------------
 # SELECCIÓN DE RUTA
 # -----------------------------
@@ -48,15 +48,31 @@ lt = fila["LT"]
 regularizacion = fila["Regularizacion [DIA]"]
 
 camiones_actual = fila["Camiones/dia"]
+if pd.isna(camiones_actual) or camiones_actual <= 0:
+    camiones_actual = 1
+
+if pd.isna(lt) or lt <= 0:
+    lt = 1
 
 # -----------------------------
 # SLIDER
 # -----------------------------
 camiones_simulados = st.slider(
     "Camiones por día",
-    min_value=1,
+    min_value=0,
     max_value=30,
     value=int(camiones_actual)
+)
+
+#------------------------------
+# RELLENO DE MERCADO
+#------------------------------
+relleno_mercado = st.number_input(
+    "Relleno de mercado (días)",
+    min_value=0,
+    max_value=30,
+    value=0,
+    step=1
 )
 
 # -----------------------------
@@ -74,18 +90,22 @@ capacidad_nueva = (
 dp7 = req_dia * 7
 dp15 = req_dia * 15
 
-tiempo7_nuevo = (
-    dp7 / capacidad_nueva
-) + regularizacion
+if capacidad_nueva <= 0:
+    tiempo7_nuevo = None
+    tiempo15_nuevo = None
+else:
+    tiempo7_nuevo = (
+        dp7 / capacidad_nueva
+    ) + regularizacion + relleno_mercado
 
-tiempo15_nuevo = (
-    dp15 / capacidad_nueva
-) + regularizacion
+    tiempo15_nuevo = (
+        dp15 / capacidad_nueva
+    ) + regularizacion + relleno_mercado
 
 # -----------------------------
 # MÉTRICAS
 # -----------------------------
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     st.metric(
@@ -95,7 +115,7 @@ with col1:
 
 with col2:
     st.metric(
-        "LT",
+        "LT Base",
         f"{lt}"
     )
 
@@ -110,7 +130,11 @@ with col4:
         "Camiones simulados",
         f"{camiones_simulados}"
     )
-
+with col5:
+    st.metric(
+        "Relleno Mercado",
+        f"{relleno_mercado}"
+    )
 st.divider()
 
 # -----------------------------
@@ -143,17 +167,24 @@ st.divider()
 col1, col2 = st.columns(2)
 
 with col1:
-    st.metric(
-        "Tiempo 7Dp",
-        f"{tiempo7_nuevo:.2f} días"
-    )
+    if tiempo7_nuevo is None:
+        st.markdown("**Tiempo 7Dp**")
+        st.error("Sin capacidad de despacho")
+    else:
+        st.metric(
+            "Tiempo 7Dp",
+            f"{tiempo7_nuevo:.2f} días"
+        )
 
 with col2:
-    st.metric(
-        "Tiempo 15Dp",
-        f"{tiempo15_nuevo:.2f} días"
-    )
-
+    if tiempo15_nuevo is None:
+        st.markdown("**Tiempo 7Dp**")
+        st.error("Sin capacidad de despacho")
+    else:
+        st.metric(
+            "Tiempo 15Dp",
+            f"{tiempo15_nuevo:.2f} días"
+        )
 # -----------------------------
 # TABLA RESUMEN
 # -----------------------------
@@ -162,7 +193,7 @@ st.subheader("Resumen")
 resumen = pd.DataFrame({
     "Variable": [
         "Ruta",
-        "LT",
+        "LT Base",
         "Regularización",
         "Requerimiento Día",
         "Camiones",
@@ -170,7 +201,8 @@ resumen = pd.DataFrame({
         "7Dp",
         "15Dp",
         "Tiempo 7Dp",
-        "Tiempo 15Dp"
+        "Tiempo 15Dp",
+        "Relleno Mercado"
     ],
     "Valor": [
         ruta_seleccionada,
@@ -181,12 +213,13 @@ resumen = pd.DataFrame({
         round(capacidad_nueva, 2),
         round(dp7, 2),
         round(dp15, 2),
-        round(tiempo7_nuevo, 2),
-        round(tiempo15_nuevo, 2)
+        "Sin capacidad" if tiempo7_nuevo is None else round(tiempo7_nuevo, 2),
+        "Sin capacidad" if tiempo15_nuevo is None else round(tiempo15_nuevo, 2),
+        relleno_mercado
     ]
 })
-
+resumen["Valor"] = resumen["Valor"].astype(str)
 st.dataframe(
     resumen,
-    use_container_width=True
+    width="stretch"
 )
